@@ -62,15 +62,15 @@ def printar_metricas(metricas, modelo):
             print(f"{metrica.replace('_', ' ').capitalize():<30} | N/A")
     print("-" * 45 + "\n")
 
-def plotagraficos (dados_treino : pd.DataFrame, opiniao, modelo):
+def plotagraficos (X : pd.DataFrame, opiniao, modelo):
 
-    nome_coluna1 = dados_treino.columns[0]
-    nome_coluna2 = dados_treino.columns[1]
-    nome_colunaClass = dados_treino.columns[-1]
+    nome_coluna1 = X.columns[0]
+    nome_coluna2 = X.columns[1]
+    nome_colunaClass = X.columns[-1]
 
-    coluna1 = dados_treino[nome_coluna1]
-    coluna2 = dados_treino[nome_coluna2]
-    colunaClass = dados_treino[nome_colunaClass]
+    coluna1 = X[nome_coluna1]
+    coluna2 = X[nome_coluna2]
+    colunaClass = X[nome_colunaClass]
     
     f,(ax1,ax2)=plt.subplots(1,2,sharey=True,figsize=(20,7.5))
     ax1.set_title("Original")
@@ -80,6 +80,8 @@ def plotagraficos (dados_treino : pd.DataFrame, opiniao, modelo):
     plt.show()
 
 def main():
+
+    modelos = {}
 
     # 1. Ler dados
     cprint("Lendo dados...")
@@ -91,32 +93,73 @@ def main():
     # dados = data_augmentation(dados, fator_escala=2)
     # cprint(f"Dataset após augmentation: {dados.shape[0]} amostras.")
 
-    # Separação de features e labels reais
-    dados_treino = dados.iloc[:, :-1]
-    y_true = dados.iloc[:, -1]
+    # Separação entre treino e classes reais
+    X = dados.iloc[:, :-1]
+    Y = dados.iloc[:, -1]
 
-    # 3. Modelos para rodar
-    modelos = {
-        "K-Means": KMeans(n_clusters=2, max_iter=300, random_state=42),
-        "AGNES": AgglomerativeClustering(n_clusters=2, linkage='complete'),
-        "DBSCAN": DBSCAN(eps=0.8, min_samples=20)
-    }
+    # Rodando algoritmos
+
+# ── KMEANS ────────────────────────────────────────────────────────────────────
+    maior_ARI = -1
+    melhor_modelo_kmeans = None
+    for n_clusters in range(2, 20):
+        for max_iter in [100, 300, 500, 1000, 2000, 5000]:
+            modelo = KMeans(n_clusters=n_clusters, max_iter=max_iter, random_state=42, n_init=10)
+            modelo.fit(X)
+            ARI = adjusted_rand_score(Y, modelo.labels_)
+            if ARI > maior_ARI:
+                maior_ARI = ARI
+                melhor_modelo_kmeans = modelo
+
+    cprint(f"Melhor configuração: n_clusters={melhor_modelo_kmeans.n_clusters}, max_iter={melhor_modelo_kmeans.max_iter}, ARI={maior_ARI:.4f}", label="KMEANS")
+    modelos["K-Means"] = melhor_modelo_kmeans
+
+# ── AGNES ─────────────────────────────────────────────────────────────────────
+    maior_ARI = -1
+    melhor_modelo_agnes = None
+    for n_clusters in range(2, 20):
+        for linkage in ['ward', 'complete', 'average', 'single']:
+            modelo = AgglomerativeClustering(n_clusters=n_clusters, linkage=linkage)
+            modelo.fit(X)
+            ARI = adjusted_rand_score(Y, modelo.labels_)
+            if ARI > maior_ARI:
+                maior_ARI = ARI
+                melhor_modelo_agnes = modelo
+
+    cprint(f"Melhor configuração: n_clusters={melhor_modelo_agnes.n_clusters}, linkage={melhor_modelo_agnes.linkage}, ARI={maior_ARI:.4f}", label="AGNES")
+    modelos["AGNES"] = melhor_modelo_agnes
+
+# ── DBSCAN ────────────────────────────────────────────────────────────────────
+    maior_ARI = -1
+    melhor_modelo_dbscan = None
+    for eps in range(1, 20, 1): # sera divido por 10 depois
+        eps = eps/10
+        for min_samples in range(5, 30, 1):
+            modelo = DBSCAN(eps=eps, min_samples=min_samples)
+            modelo.fit(X)
+            ARI = adjusted_rand_score(Y, modelo.labels_)
+            if ARI > maior_ARI:
+                maior_ARI = ARI
+                melhor_modelo_dbscan = modelo
+
+    cprint(f"Melhor configuração: eps={melhor_modelo_dbscan.eps}, min_samples={melhor_modelo_dbscan.min_samples}, ARI={maior_ARI:.4f}", label="DBSCAN")
+    modelos["DBSCAN"] = melhor_modelo_dbscan
 
     for nome, modelo in modelos.items():
         cprint(f"Rodando {nome}...", label=nome.upper())
         
         # Treino e Predição
-        modelo.fit(dados_treino)
+        modelo.fit(X)
         opiniao = modelo.labels_
 
         # Cálculo de Métricas
         metricas = {
-            "homogeneidade": homogeneity_score(y_true, opiniao),
-            "completude": completeness_score(y_true, opiniao),
-            "v_measure": v_measure_score(y_true, opiniao),
-            "indice_randomico": rand_score(y_true, opiniao),
-            "indice_randomico_ajustado": adjusted_rand_score(y_true, opiniao),
-            "silhueta": silhouette_score(dados_treino, opiniao),
+            "homogeneidade": homogeneity_score(Y, opiniao),
+            "completude": completeness_score(Y, opiniao),
+            "v_measure": v_measure_score(Y, opiniao),
+            "indice_randomico": rand_score(Y, opiniao),
+            "indice_randomico_ajustado": adjusted_rand_score(Y, opiniao),
+            "silhueta": silhouette_score(X, opiniao),
             "entropia": None # implementar
         }
 
