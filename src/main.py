@@ -14,6 +14,7 @@ from utils.print_customizado import cprint
 
 # Métodos
 from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering
+from metricas
 
 
 # Métricas
@@ -31,24 +32,6 @@ def ler_dados():
     dados = pd.read_csv(caminho_dados)
 
     return dados
-
-def data_augmentation(dados, fator_escala=1):
-    """Aumenta o dataset aplicando ruído aleatório entre 1% e 10%"""
-    if fator_escala <= 1:
-        return dados
-    
-    novos_dados_lista = [dados]
-    atributos = dados.columns[:-1]
-    
-    for _ in range(fator_escala - 1):
-        dados_ruido = dados.copy()
-        for col in atributos:
-            ruido_percentual = np.random.uniform(0.01, 0.10, size=len(dados_ruido))
-            direcao = np.random.choice([-1, 1], size=len(dados_ruido))
-            dados_ruido[col] = dados_ruido[col] * (1 + (direcao * ruido_percentual))
-        novos_dados_lista.append(dados_ruido)
-        
-    return pd.concat(novos_dados_lista, ignore_index=True)
 
 def printar_metricas(metricas, modelo):
     cprint(f"Métricas para o modelo: {modelo}", label="METRICAS")
@@ -97,11 +80,6 @@ def main():
     cprint("Lendo dados...")
     dados = ler_dados()
     cprint(f"Dados carregados: {dados.shape[0]} amostras, {dados.shape[1]} colunas.")
-
-    # # 2. Augmentation
-    # cprint("Aplicando Data Augmentation...", label="MAIN")
-    # dados = data_augmentation(dados, fator_escala=2)
-    # cprint(f"Dataset após augmentation: {dados.shape[0]} amostras.")
 
     # Separação entre treino e classes reais
     X = dados.iloc[:, :-1]
