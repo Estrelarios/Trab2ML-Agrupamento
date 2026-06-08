@@ -26,7 +26,7 @@ def ler_dados():
     
     caminho_atual = Path(__file__).resolve()
     raiz = caminho_atual.parent.parent
-    caminho_dados = raiz / "dados_raw" / "Banana.csv"
+    caminho_dados = raiz / "dados_raw" / "dados.csv"
 
     dados = pd.read_csv(caminho_dados)
 
@@ -72,12 +72,22 @@ def plotagraficos (X : pd.DataFrame, opiniao, modelo):
     coluna2 = X[nome_coluna2]
     colunaClass = X[nome_colunaClass]
     
+    # Criar diretório de resultados se não existir
+    caminho_resultados = Path(__file__).resolve().parent.parent / "resultados"
+    caminho_resultados.mkdir(exist_ok=True)
+
     f,(ax1,ax2)=plt.subplots(1,2,sharey=True,figsize=(20,7.5))
     ax1.set_title("Original")
     ax1.scatter(coluna1,coluna2,c=colunaClass,cmap="rainbow")
     ax2.set_title(label=modelo)
     ax2.scatter(coluna1,coluna2,c=opiniao,cmap="rainbow")
-    plt.show()
+    
+    # Salvar o gráfico
+    nome_arquivo = f"resultado_{modelo.lower().replace('-', '_')}.png"
+    plt.savefig(caminho_resultados / nome_arquivo)
+    cprint(f"Gráfico salvo em: {caminho_resultados / nome_arquivo}", label="PLOT")
+    
+    plt.close(f) # Fecha a figura para liberar memória
 
 def main():
 
@@ -154,6 +164,7 @@ def main():
 
         # Cálculo de Métricas
         metricas = {
+            # Coesao, Separação
             "homogeneidade": homogeneity_score(Y, opiniao),
             "completude": completeness_score(Y, opiniao),
             "v_measure": v_measure_score(Y, opiniao),
