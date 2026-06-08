@@ -14,14 +14,14 @@ from utils.print_customizado import cprint
 
 # Métodos
 from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering
-from metricas
+from src.metricas import entropia, coesao, separacao
 
 
 # Métricas
 from sklearn.metrics import homogeneity_score, completeness_score, v_measure_score
 from sklearn.metrics import rand_score, adjusted_rand_score, silhouette_score
 from sklearn.metrics.cluster import contingency_matrix
-from scipy.stats import entropy
+
 
 def ler_dados():
     
@@ -149,7 +149,9 @@ def main():
             "indice_randomico": rand_score(Y, opiniao),
             "indice_randomico_ajustado": adjusted_rand_score(Y, opiniao),
             "silhueta": silhouette_score(X, opiniao),
-            "entropia": None # implementar
+            "1 - entropia": 1 - entropia(Y, opiniao),          #None # implementar
+            "1 - coesao": 1 - coesao(X, opiniao),                    #None # implementar
+            "separacao": None # implementar
         }
 
         # Exibição
