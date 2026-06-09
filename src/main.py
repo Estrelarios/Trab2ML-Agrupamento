@@ -14,7 +14,7 @@ from utils.print_customizado import cprint
 
 # Métodos
 from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering
-from src.metricas import entropia, coesao, separacao
+from src.metricas import entropia, coesao, separacao_clusters, separacao_pontoAponto
 
 
 # Métricas
@@ -72,6 +72,36 @@ def plotagraficos (X : pd.DataFrame, opiniao, modelo):
     
     plt.close(f) # Fecha a figura para liberar memória
 
+
+
+def calcular_fitness(Y_real, Y_pred, X):
+    
+    # Evita erro se houver apenas 1 cluster ou apenas ruído
+    n_clusters = len(set(Y_pred)) - (1 if -1 in Y_pred else 0)
+    if n_clusters <= 1:
+        return -1
+
+    ari = adjusted_rand_score(Y_real, Y_pred)
+    homog = homogeneity_score(Y_real, Y_pred)
+    try:
+        sil = silhouette_score(X, Y_pred)
+    except:
+        sil = 0
+
+    # ---------------------------------------------------------
+    # ESCOLHA A ABORDAGEM AQUI (Comente/Descomente):
+    
+    # Abordagem 1: Separar invasores
+    # pesos = {"ari": 0.4, "homog": 0.5, "sil": 0.1}
+    
+    # Abordagem 2: Área de incerteza
+    pesos = {"ari": 0.3, "homog": 0.3, "sil": 0.4}
+    # ---------------------------------------------------------
+
+    score = (pesos["ari"] * ari) + (pesos["homog"] * homog) + (pesos["sil"] * sil)
+    return score
+
+
 def main():
 
     modelos = {}
@@ -88,49 +118,49 @@ def main():
     # Rodando algoritmos
 
 # ── KMEANS ────────────────────────────────────────────────────────────────────
-    maior_ARI = -1
+    melhor_score = -1
     melhor_modelo_kmeans = None
     for n_clusters in range(2, 10):
         for max_iter in [2, 5, 10, 20, 30, 40, 50, 100, 150, 200, 250, 300]:
             modelo = KMeans(n_clusters=n_clusters, max_iter=max_iter, random_state=42, n_init=10)
             modelo.fit(X)
-            ARI = adjusted_rand_score(Y, modelo.labels_)
-            if ARI > maior_ARI:
-                maior_ARI = ARI
+            score = calcular_fitness(Y, modelo.labels_, X)
+            if score > melhor_score:
+                melhor_score = score
                 melhor_modelo_kmeans = modelo
 
-    cprint(f"Melhor configuração: n_clusters={melhor_modelo_kmeans.n_clusters}, max_iter={melhor_modelo_kmeans.max_iter}, ARI={maior_ARI:.4f}", label="KMEANS")
+    cprint(f"Melhor configuração: n_clusters={melhor_modelo_kmeans.n_clusters}, max_iter={melhor_modelo_kmeans.max_iter}, score={melhor_score:.4f}", label="KMEANS")
     modelos["K-Means"] = melhor_modelo_kmeans
 
 # ── AGNES ─────────────────────────────────────────────────────────────────────
-    maior_ARI = -1
+    melhor_score = -1
     melhor_modelo_agnes = None
     for n_clusters in range(2, 10):
         for linkage in ['ward', 'complete', 'average', 'single']:
             modelo = AgglomerativeClustering(n_clusters=n_clusters, linkage=linkage)
             modelo.fit(X)
-            ARI = adjusted_rand_score(Y, modelo.labels_)
-            if ARI > maior_ARI:
-                maior_ARI = ARI
+            score = calcular_fitness(Y, modelo.labels_, X)
+            if score > melhor_score:
+                melhor_score = score
                 melhor_modelo_agnes = modelo
 
-    cprint(f"Melhor configuração: n_clusters={melhor_modelo_agnes.n_clusters}, linkage={melhor_modelo_agnes.linkage}, ARI={maior_ARI:.4f}", label="AGNES")
+    cprint(f"Melhor configuração: n_clusters={melhor_modelo_agnes.n_clusters}, linkage={melhor_modelo_agnes.linkage}, score={melhor_score:.4f}", label="AGNES")
     modelos["AGNES"] = melhor_modelo_agnes
 
 # ── DBSCAN ────────────────────────────────────────────────────────────────────
-    maior_ARI = -1
+    melhor_score = -1
     melhor_modelo_dbscan = None
-    for eps in range(1, 200, 1): # eps in range (0.1 ate 2.0)
+    for eps in range(1, 200, 1): # eps in range (0.01 ate 2.0)
         eps = eps/100
         for min_samples in range(5, 30, 1):
             modelo = DBSCAN(eps=eps, min_samples=min_samples)
             modelo.fit(X)
-            ARI = adjusted_rand_score(Y, modelo.labels_)
-            if ARI > maior_ARI:
-                maior_ARI = ARI
+            score = calcular_fitness(Y, modelo.labels_, X)
+            if score > melhor_score:
+                melhor_score = score
                 melhor_modelo_dbscan = modelo
 
-    cprint(f"Melhor configuração: eps={melhor_modelo_dbscan.eps}, min_samples={melhor_modelo_dbscan.min_samples}, ARI={maior_ARI:.4f}", label="DBSCAN")
+    cprint(f"Melhor configuração: eps={melhor_modelo_dbscan.eps}, min_samples={melhor_modelo_dbscan.min_samples}, score={melhor_score:.4f}", label="DBSCAN")
     modelos["DBSCAN"] = melhor_modelo_dbscan
 
     for nome, modelo in modelos.items():
