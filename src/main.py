@@ -84,32 +84,77 @@ def plotagraficos (X : pd.DataFrame, opiniao, modelo):
     plt.close(f) # Fecha a figura para liberar memória
 
 
-
-def calcular_fitness(Y_real, Y_pred, X):
     
+def calcular_fitness(Y_real, Y_pred, X):
     # Evita erro se houver apenas 1 cluster ou apenas ruído
     n_clusters = len(set(Y_pred)) - (1 if -1 in Y_pred else 0)
     if n_clusters <= 1:
         return -1
 
-    ari = adjusted_rand_score(Y_real, Y_pred)
-    homog = homogeneity_score(Y_real, Y_pred)
-    try:
-        sil = silhouette_score(X, Y_pred)
-    except:
-        sil = 0
-
     # ---------------------------------------------------------
-    # ESCOLHA A ABORDAGEM AQUI (Comente/Descomente):
-    
+    # ESCOLHA A ABORDAGEM AQUI:
+
+    # # Abordagem default: maximiza ARI
+    # pesos = {
+    #     'ari' : 1.0
+    # }
+
     # Abordagem 1: Separar invasores
-    # pesos = {"ari": 0.4, "homog": 0.5, "sil": 0.1}
+    pesos = {
+        # "ari": 0.1, 
+        "homog": 0.15, 
+        "completeness": 0.15,
+        "1-entropia" : 0.7,
+        }
+
+    # # Abordagem 2: Área de incerteza (Rever pesos)
+    # pesos = {
+    #     "ari": 0.3, 
+    #     "homog": 0.3, 
+    #     "sil": 0.4
+    #     }
     
-    # Abordagem 2: Área de incerteza
-    pesos = {"ari": 0.3, "homog": 0.3, "sil": 0.4}
+    # # Abordagem 3: igualitaria
+    # pesos = {
+    #     "ari": 0.2, 
+    #     "homog": 0.2, 
+    #     "sil": 0.2,
+    #     "completeness": 0.2,
+    #     "1-entropia" : 0.2,
+    #     }
+
     # ---------------------------------------------------------
 
-    score = (pesos["ari"] * ari) + (pesos["homog"] * homog) + (pesos["sil"] * sil)
+    # Dicionário de funções para cálculo dinâmico
+    # Só calcula o que estiver presente nos pesos para economizar processamento
+    valores = {}
+
+    if "ari" in pesos:
+        valores["ari"] = adjusted_rand_score(Y_real, Y_pred)
+
+    if "homog" in pesos:
+        valores["homog"] = homogeneity_score(Y_real, Y_pred)
+
+    if "sil" in pesos:
+        try: # Caso só tenha 1 cluster da erro
+            valores["sil"] = silhouette_score(X, Y_pred)
+        except:
+            valores["sil"] = 0
+
+    if "1-entropia" in pesos:
+        valores["1-entropia"] = 1 - entropia(Y_real, Y_pred)
+
+    if "1-coesao" in pesos:
+        valores["1-coesao"] = 1 - coesao(X, Y_pred)
+
+    if "v_measure" in pesos:
+        valores["v_measure"] = v_measure_score(Y_real, Y_pred)
+
+    if "completeness" in pesos:
+        valores["completeness"] = completeness_score(Y_real, Y_pred)
+
+    # Calculo score final
+    score = sum(valores[m] * pesos[m] for m in pesos if m in valores)
     return score
 
 
@@ -161,10 +206,10 @@ def main():
 # ── DBSCAN ────────────────────────────────────────────────────────────────────
     melhor_score = -1
     melhor_modelo_dbscan = None
-    for eps in range(1, 200, 1): # eps in range (0.01 ate 2.0)
+    for eps in range(1, 200, 5): # eps in range (0.01 ate 2.0)
         eps = eps/100
         for min_samples in range(5, 30, 1):
-            modelo = DBSCAN(eps=eps, min_samples=min_samples)
+            modelo = DBSCAN(eps=eps, min_samples=min_samples, n_jobs=-1, algorithm="kd_tree")
             modelo.fit(X)
             score = calcular_fitness(Y, modelo.labels_, X)
             if score > melhor_score:
