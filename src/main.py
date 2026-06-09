@@ -90,8 +90,8 @@ def main():
 # ── KMEANS ────────────────────────────────────────────────────────────────────
     maior_ARI = -1
     melhor_modelo_kmeans = None
-    for n_clusters in range(2, 20):
-        for max_iter in [100, 300, 500, 1000, 2000, 5000]:
+    for n_clusters in range(2, 10):
+        for max_iter in [2, 5, 10, 20, 30, 40, 50, 100, 150, 200, 250, 300]:
             modelo = KMeans(n_clusters=n_clusters, max_iter=max_iter, random_state=42, n_init=10)
             modelo.fit(X)
             ARI = adjusted_rand_score(Y, modelo.labels_)
@@ -105,7 +105,7 @@ def main():
 # ── AGNES ─────────────────────────────────────────────────────────────────────
     maior_ARI = -1
     melhor_modelo_agnes = None
-    for n_clusters in range(2, 20):
+    for n_clusters in range(2, 10):
         for linkage in ['ward', 'complete', 'average', 'single']:
             modelo = AgglomerativeClustering(n_clusters=n_clusters, linkage=linkage)
             modelo.fit(X)
@@ -120,8 +120,8 @@ def main():
 # ── DBSCAN ────────────────────────────────────────────────────────────────────
     maior_ARI = -1
     melhor_modelo_dbscan = None
-    for eps in range(1, 20, 1): # sera divido por 10 depois
-        eps = eps/10
+    for eps in range(1, 200, 1): # eps in range (0.1 ate 2.0)
+        eps = eps/100
         for min_samples in range(5, 30, 1):
             modelo = DBSCAN(eps=eps, min_samples=min_samples)
             modelo.fit(X)
