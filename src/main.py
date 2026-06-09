@@ -62,8 +62,19 @@ def plotagraficos (X : pd.DataFrame, opiniao, modelo):
     f,(ax1,ax2)=plt.subplots(1,2,sharey=True,figsize=(20,7.5))
     ax1.set_title("Original")
     ax1.scatter(coluna1,coluna2,c=colunaClass,cmap="rainbow")
+    
     ax2.set_title(label=modelo)
-    ax2.scatter(coluna1,coluna2,c=opiniao,cmap="rainbow")
+    
+    # Tratamento para destacar o ruído se existir
+    if -1 in list(opiniao):
+        # Pontos normais
+        mask_normal = opiniao != -1
+        ax2.scatter(coluna1[mask_normal], coluna2[mask_normal], c=opiniao[mask_normal], cmap="rainbow")
+        # Pontos de ruído em preto
+        ax2.scatter(coluna1[~mask_normal], coluna2[~mask_normal], c='black', label='Ruído', marker='x', s=50)
+        ax2.legend(loc='upper right')
+    else:
+        ax2.scatter(coluna1, coluna2, c=opiniao, cmap="rainbow")
     
     # Salvar o gráfico
     nome_arquivo = f"resultado_{modelo.lower().replace('-', '_')}.png"
