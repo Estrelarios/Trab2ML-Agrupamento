@@ -2,13 +2,18 @@
 
 ## Implementação
 
+- [] **Dados**
+    - [] Verificar se precisam de pre processamento (normalização)
+
 - [ ] **Métricas Intrínsecas:**
-    - [ ] Implementar cálculo de **Coesão** (ex: WCSS - Within-Cluster Sum of Squares).
+    - [x] Implementar cálculo de **Coesão** (ex: WCSS - Within-Cluster Sum of Squares).
     - [ ] Implementar cálculo de **Separação** (ex: BSS - Between-Cluster Sum of Squares).
+        - [ ] Perguntar pro andrezao qual tipo é pra usar, elemento de um cluster para todos os outros ou centroide para centroide
     - [x] Validar **Coeficiente de Silhueta** (já presente no código).
 
 - [ ] **Métricas Extrínsecas:**
-    - [ ] Implementar cálculo de **Entropia** (pode ser a média da entropia de cada cluster em relação às classes reais).
+    - [] Implementar cálculo de **Entropia** (pode ser a média da entropia de cada cluster em relação às classes reais).
+        - [] Conferir se é para deixar a entropia prox de 0 mesmo ou se é para fazer 1 - entropia. Por que? -> entropia é minimização, os outros não
     - [x] Validar **Homogeneidade** (já presente).
     - [x] Validar **Completude** (já presente).
     - [x] Validar **V-Measure** (já presente).
@@ -16,9 +21,8 @@
     - [x] Validar **Índice Randômico Ajustado (ARI)** (já presente).
 
 - [ ] **Calibração de Modelos:**
-    - [ ] Refinar a busca de hiperparâmetros (Grid Search) para garantir que estamos explorando os intervalos sugeridos no PDF (ex: K no K-means entre 1 e 10).
-    - [ ] Ajustar a lógica de escolha do "melhor" modelo. O PDF sugere basear-se nos índices de avaliação, não necessariamente apenas no ARI (que depende do conhecimento prévio das classes). Talvez considerar Silhouette para a escolha se as classes forem "desconhecidas", mas o PDF permite usar todas.
-    - [ ] Garantir que os hiperparâmetros específicos da Tabela 1 estão sendo calibrados:
+    - [ ] Ajustar a lógica de escolha do "melhor" modelo e calibração de parametros: Ver sobre função de fitness com soma ponderada das métricas.
+    - [x] Garantir que os hiperparâmetros específicos da Tabela 1 estão sendo calibrados:
         - [x] K-means: `n_clusters`, `max_iter`.
         - [x] DBScan: `eps`, `min_samples`.
         - [x] AGNES: `n_clusters`, `linkage`.
