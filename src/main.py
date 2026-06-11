@@ -21,7 +21,14 @@ from src.metricas import entropia, coesao, separacao_clusters, separacao_pontoAp
 from sklearn.metrics import homogeneity_score, completeness_score, v_measure_score
 from sklearn.metrics import rand_score, adjusted_rand_score, silhouette_score
 from sklearn.metrics.cluster import contingency_matrix
+from sklearn.preprocessing import StandardScaler
 
+# Configuração de pesos para avaliação
+pesos_config = {
+    "ari": 1,
+    # "v_measure" : .5,
+    # "sil" : .25,
+}
 
 def ler_dados():
     
@@ -45,7 +52,7 @@ def printar_metricas(metricas, modelo):
             print(f"{metrica.replace('_', ' ').capitalize():<30} | N/A")
     print("-" * 45 + "\n")
 
-def plotagraficos (X : pd.DataFrame, opiniao, modelo):
+def plotagraficos (X : pd.DataFrame, opiniao, modelo, params, pesos):
 
     nome_coluna1 = X.columns[0]
     nome_coluna2 = X.columns[1]
@@ -63,7 +70,9 @@ def plotagraficos (X : pd.DataFrame, opiniao, modelo):
     ax1.set_title("Original")
     ax1.scatter(coluna1,coluna2,c=colunaClass,cmap="rainbow")
     
-    ax2.set_title(label=modelo)
+    # Formata pesos para o título
+    pesos_str = ", ".join([f"{k}={v}" for k, v in pesos.items()])
+    ax2.set_title(label=f"{modelo} | {params}\nPesos: {pesos_str}", fontsize=10)
     
     # Tratamento para destacar o ruído se existir
     if -1 in list(opiniao):
@@ -76,57 +85,35 @@ def plotagraficos (X : pd.DataFrame, opiniao, modelo):
     else:
         ax2.scatter(coluna1, coluna2, c=opiniao, cmap="rainbow")
     
-    # Salvar o gráfico
-    nome_arquivo = f"resultado_{modelo.lower().replace('-', '_')}.png"
-    plt.savefig(caminho_resultados / nome_arquivo)
-    cprint(f"Gráfico salvo em: {caminho_resultados / nome_arquivo}", label="PLOT")
+    # Salvar o gráfico com iterador para não sobrescrever
+    base_nome = f"resultado_{modelo.lower().replace('-', '_')}"
+    extensao = ".png"
+    
+    contador = 1
+    caminho_save = caminho_resultados / f"{base_nome}_{contador}{extensao}"
+    while caminho_save.exists():
+        contador += 1
+        caminho_save = caminho_resultados / f"{base_nome}_{contador}{extensao}"
+        
+    plt.savefig(caminho_save)
+    cprint(f"Gráfico salvo em: {caminho_save}", label="PLOT")
     
     plt.close(f) # Fecha a figura para liberar memória
 
 
     
-def calcular_fitness(Y_real, Y_pred, X):
+def avaliar(Y_real, Y_pred, X):
     # Evita erro se houver apenas 1 cluster ou apenas ruído
     n_clusters = len(set(Y_pred)) - (1 if -1 in Y_pred else 0)
     if n_clusters <= 1:
         return -1
 
-    # ---------------------------------------------------------
-    # ESCOLHA A ABORDAGEM AQUI:
-
-    # # Abordagem default: maximiza ARI
-    # pesos = {
-    #     'ari' : 1.0
-    # }
-
-    # Abordagem 1: Separar invasores
-    pesos = {
-        # "ari": 0.1, 
-        "homog": 0.15, 
-        "completeness": 0.15,
-        "1-entropia" : 0.7,
-        }
-
-    # # Abordagem 2: Área de incerteza (Rever pesos)
-    # pesos = {
-    #     "ari": 0.3, 
-    #     "homog": 0.3, 
-    #     "sil": 0.4
-    #     }
+    # Número de classes reais para normalizar entropia
+    n_classes_reais = len(np.unique(Y_real))
+    log2_n_classes = np.log2(n_classes_reais) if n_classes_reais > 1 else 1.0
     
-    # # Abordagem 3: igualitaria
-    # pesos = {
-    #     "ari": 0.2, 
-    #     "homog": 0.2, 
-    #     "sil": 0.2,
-    #     "completeness": 0.2,
-    #     "1-entropia" : 0.2,
-    #     }
+    pesos = pesos_config
 
-    # ---------------------------------------------------------
-
-    # Dicionário de funções para cálculo dinâmico
-    # Só calcula o que estiver presente nos pesos para economizar processamento
     valores = {}
 
     if "ari" in pesos:
@@ -136,13 +123,15 @@ def calcular_fitness(Y_real, Y_pred, X):
         valores["homog"] = homogeneity_score(Y_real, Y_pred)
 
     if "sil" in pesos:
-        try: # Caso só tenha 1 cluster da erro
-            valores["sil"] = silhouette_score(X, Y_pred)
+        try: 
+            sil = silhouette_score(X, Y_pred)
+            valores["sil"] = (sil + 1) / 2 # Normalização
         except:
             valores["sil"] = 0
 
     if "1-entropia" in pesos:
-        valores["1-entropia"] = 1 - entropia(Y_real, Y_pred)
+        ent = entropia(Y_real, Y_pred)
+        valores["1-entropia"] = 1 - (ent / log2_n_classes) # Normalização
 
     if "1-coesao" in pesos:
         valores["1-coesao"] = 1 - coesao(X, Y_pred)
@@ -152,6 +141,9 @@ def calcular_fitness(Y_real, Y_pred, X):
 
     if "completeness" in pesos:
         valores["completeness"] = completeness_score(Y_real, Y_pred)
+        
+    if "separacao" in pesos:
+        valores["separacao"] = separacao_clusters(X, Y_pred)
 
     # Calculo score final
     score = sum(valores[m] * pesos[m] for m in pesos if m in valores)
@@ -168,8 +160,14 @@ def main():
     cprint(f"Dados carregados: {dados.shape[0]} amostras, {dados.shape[1]} colunas.")
 
     # Separação entre treino e classes reais
-    X = dados.iloc[:, :-1]
+    X_raw = dados.iloc[:, :-1]
     Y = dados.iloc[:, -1]
+
+    # Normalização
+    cprint("Normalizando dados (StandardScaler)...")
+    scaler = StandardScaler()
+    X_np = scaler.fit_transform(X_raw)
+    X = pd.DataFrame(X_np, columns=X_raw.columns)
 
     # Rodando algoritmos
 
@@ -178,9 +176,9 @@ def main():
     melhor_modelo_kmeans = None
     for n_clusters in range(2, 10):
         for max_iter in [2, 5, 10, 20, 30, 40, 50, 100, 150, 200, 250, 300]:
-            modelo = KMeans(n_clusters=n_clusters, max_iter=max_iter, random_state=42, n_init=10)
+            modelo = KMeans(n_clusters=n_clusters, max_iter=max_iter, random_state=42)
             modelo.fit(X)
-            score = calcular_fitness(Y, modelo.labels_, X)
+            score = avaliar(Y, modelo.labels_, X)
             if score > melhor_score:
                 melhor_score = score
                 melhor_modelo_kmeans = modelo
@@ -195,7 +193,7 @@ def main():
         for linkage in ['ward', 'complete', 'average', 'single']:
             modelo = AgglomerativeClustering(n_clusters=n_clusters, linkage=linkage)
             modelo.fit(X)
-            score = calcular_fitness(Y, modelo.labels_, X)
+            score = avaliar(Y, modelo.labels_, X)
             if score > melhor_score:
                 melhor_score = score
                 melhor_modelo_agnes = modelo
@@ -211,7 +209,7 @@ def main():
         for min_samples in range(5, 30, 1):
             modelo = DBSCAN(eps=eps, min_samples=min_samples, n_jobs=-1, algorithm="kd_tree")
             modelo.fit(X)
-            score = calcular_fitness(Y, modelo.labels_, X)
+            score = avaliar(Y, modelo.labels_, X)
             if score > melhor_score:
                 melhor_score = score
                 melhor_modelo_dbscan = modelo
@@ -219,16 +217,15 @@ def main():
     cprint(f"Melhor configuração: eps={melhor_modelo_dbscan.eps}, min_samples={melhor_modelo_dbscan.min_samples}, score={melhor_score:.4f}", label="DBSCAN")
     modelos["DBSCAN"] = melhor_modelo_dbscan
 
-    for nome, modelo in modelos.items():
+    for nome, mod in modelos.items():
         cprint(f"Rodando {nome}...", label=nome.upper())
-        
-        # Treino e Predição
-        modelo.fit(X)
-        opiniao = modelo.labels_
+        opiniao = mod.labels_
 
-        # Cálculo de Métricas
+        if nome == "K-Means": params = f"n_clusters={mod.n_clusters}, max_iter={mod.max_iter}"
+        elif nome == "AGNES": params = f"n_clusters={mod.n_clusters}, linkage={mod.linkage}"
+        else: params = f"eps={mod.eps}, ms={mod.min_samples}"
+
         metricas = {
-            # Coesao, Separação
             "homogeneidade": homogeneity_score(Y, opiniao),
             "completude": completeness_score(Y, opiniao),
             "v_measure": v_measure_score(Y, opiniao),
@@ -237,12 +234,11 @@ def main():
             "silhueta": silhouette_score(X, opiniao),
             "1 - entropia": 1 - entropia(Y, opiniao),          #None # implementar
             "1 - coesao": 1 - coesao(X, opiniao),                    #None # implementar
-            "separacao": None # implementar
+            "separacao": separacao_clusters(X, opiniao)
         }
 
-        # Exibição
         printar_metricas(metricas, nome)
-        plotagraficos(dados, opiniao, nome)
+        plotagraficos(dados, opiniao, nome, params, pesos_config)
 
     cprint("Processamento concluído.")
 
