@@ -24,10 +24,20 @@ from sklearn.metrics.cluster import contingency_matrix
 from sklearn.preprocessing import StandardScaler
 
 # Configuração de pesos para avaliação
+# Opções:
+# ari
+# homog
+# sil
+# 1-entropia
+# 1-coesao
+# v_measure
+# completeness
+# separacao
+
 pesos_config = {
-    "ari": 1,
-    # "v_measure" : .5,
-    # "sil" : .25,
+    "1-coesao": 0.8,
+    "v_measure" : .1,
+    "sil" : .1,
 }
 
 def ler_dados():
@@ -143,7 +153,16 @@ def avaliar(Y_real, Y_pred, X):
         valores["completeness"] = completeness_score(Y_real, Y_pred)
         
     if "separacao" in pesos:
-        valores["separacao"] = separacao_clusters(X, Y_pred)
+        sep = separacao_clusters(X, Y_pred)
+        
+        # Normalização pelo diâmetro máximo dos dados
+        X_array = np.array(X)
+        distancia_maxima = np.linalg.norm(X_array.max(axis=0) - X_array.min(axis=0))
+        
+        if distancia_maxima > 0:
+            valores["separacao"] = sep / distancia_maxima
+        else:
+            valores["separacao"] = 0.0
 
     # Calculo score final
     score = sum(valores[m] * pesos[m] for m in pesos if m in valores)
@@ -168,6 +187,9 @@ def main():
     scaler = StandardScaler()
     X_np = scaler.fit_transform(X_raw)
     X = pd.DataFrame(X_np, columns=X_raw.columns)
+
+    # Diâmetro dos dados para normalização de métricas de distância
+    distancia_maxima = np.linalg.norm(X_np.max(axis=0) - X_np.min(axis=0))
 
     # Rodando algoritmos
 
@@ -225,6 +247,10 @@ def main():
         elif nome == "AGNES": params = f"n_clusters={mod.n_clusters}, linkage={mod.linkage}"
         else: params = f"eps={mod.eps}, ms={mod.min_samples}"
 
+        # Métricas com normalização para separação
+        sep = separacao_clusters(X, opiniao)
+        sep_norm = sep / distancia_maxima if distancia_maxima > 0 else 0.0
+
         metricas = {
             "homogeneidade": homogeneity_score(Y, opiniao),
             "completude": completeness_score(Y, opiniao),
@@ -232,9 +258,9 @@ def main():
             "indice_randomico": rand_score(Y, opiniao),
             "indice_randomico_ajustado": adjusted_rand_score(Y, opiniao),
             "silhueta": silhouette_score(X, opiniao),
-            "1 - entropia": 1 - entropia(Y, opiniao),          #None # implementar
-            "1 - coesao": 1 - coesao(X, opiniao),                    #None # implementar
-            "separacao": separacao_clusters(X, opiniao)
+            "1 - entropia": 1 - entropia(Y, opiniao),
+            "1 - coesao": 1 - coesao(X, opiniao),
+            "separacao": sep_norm
         }
 
         printar_metricas(metricas, nome)
