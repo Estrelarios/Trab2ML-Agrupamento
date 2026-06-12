@@ -1,0 +1,3 @@
+# Busca exaustiva de parâmetros para o DBSCAN
+
+Esse diretorio tem código para fazer um busca de hiperparâmetros do DBSCAN e busca de valores dos pesos função de avaliação que resulte em combinações de clusters diferentes (código *busca_exaustiva_pesos.py*). As imagens em resultados mostram resultados únicos e os valores para formá-los. O código *mostrar_animação.py* faz uma animação desses resultados para visualização rápida.
